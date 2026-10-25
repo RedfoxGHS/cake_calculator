@@ -124,7 +124,7 @@ class _RecipeTile extends StatelessWidget {
         ),
         title: Text(recipe.name, style: t.textTheme.titleMedium),
         subtitle: Text(
-          '${recipe.category.label} · ${panLabel(store.pan(recipe.panId))} · '
+          '${recipe.category.label} · ${recipeYield(recipe, store.pan(recipe.panId))} · '
           '${recipe.items.length} ingredientes',
         ),
         trailing: cost == null
@@ -195,7 +195,7 @@ class RecipeDetailScreen extends StatelessWidget {
               ),
               Chip(
                 avatar: const Icon(Icons.crop_square, size: 18),
-                label: Text(panLabel(store.pan(r.panId))),
+                label: Text(recipeYield(r, store.pan(r.panId))),
               ),
             ],
           ),
@@ -259,6 +259,9 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
   late RecipeCategory _cat =
       widget.recipe?.category ?? widget.category ?? RecipeCategory.massa;
   String? _panId;
+  late int _yield = widget.recipe?.yieldPans ?? 1;
+  late bool _perLayer =
+      widget.recipe?.perLayer ?? _cat == RecipeCategory.recheio;
   late final List<RecipeItem> _items = [
     for (final i in widget.recipe?.items ?? <RecipeItem>[])
       RecipeItem(productId: i.productId, qty: i.qty),
@@ -337,6 +340,8 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
         panId: _panId,
         items: items,
         notes: _notes.text,
+        yieldPans: _yield,
+        perLayer: _cat == RecipeCategory.recheio && _perLayer,
       ),
     );
     Navigator.pop(context);
@@ -370,13 +375,34 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
                 ButtonSegment(value: c, label: Text(c.label)),
             ],
             selected: {_cat},
-            onSelectionChanged: (s) => setState(() => _cat = s.first),
+            onSelectionChanged: (s) => setState(() {
+              _cat = s.first;
+              // Recheio novo já começa "por camada", que é o mais comum.
+              if (widget.recipe == null) {
+                _perLayer = _cat == RecipeCategory.recheio;
+              }
+            }),
           ),
           const SizedBox(height: 16),
+          if (_cat == RecipeCategory.recheio) ...[
+            Card(
+              child: SwitchListTile(
+                value: _perLayer,
+                onChanged: (v) => setState(() => _perLayer = v),
+                title: const Text('Essa quantidade é para 1 camada'),
+                subtitle: const Text(
+                  'Na simulação o app multiplica pelas camadas do bolo.',
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           DropdownButtonFormField<String>(
             initialValue: _panId,
-            decoration: const InputDecoration(
-              labelText: 'Essa receita rende para a forma',
+            decoration: InputDecoration(
+              labelText: _cat == RecipeCategory.recheio && _perLayer
+                  ? 'Camada da forma'
+                  : 'Forma da receita',
               helperText:
                   'Na simulação o app aumenta ou diminui pela forma escolhida.',
             ),
@@ -386,6 +412,16 @@ class _RecipeEditScreenState extends State<RecipeEditScreen> {
             ],
             onChanged: (v) => setState(() => _panId = v),
           ),
+          if (!(_cat == RecipeCategory.recheio && _perLayer)) ...[
+            const SizedBox(height: 12),
+            CountRow(
+              label: 'Rende quantas formas',
+              helper: 'Ex.: uma massa que você divide em 2 formas',
+              value: _yield,
+              max: 10,
+              onChanged: (v) => setState(() => _yield = v),
+            ),
+          ],
           SectionTitle('Ingredientes', trailing: Text('${_items.length}')),
           for (final (i, it) in _items.indexed)
             if (store.product(it.productId) case final p?)

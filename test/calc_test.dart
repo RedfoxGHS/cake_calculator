@@ -47,6 +47,35 @@ void main() {
     expect(autoTimes(s, massa, pan25, 2), closeTo(3.125, 1e-9));
   });
 
+  test('receita que rende 2 formas não dobra com 2 formas', () {
+    final pan20 = s.pans.firstWhere(
+      (p) => p.shape == PanShape.round && p.a == 20,
+    );
+    final pan25 = s.pans.firstWhere(
+      (p) => p.shape == PanShape.round && p.a == 25,
+    );
+    massa.yieldPans = 2;
+    expect(autoTimes(s, massa, pan20, 2), closeTo(1, 1e-9));
+    expect(autoTimes(s, massa, pan25, 2), closeTo(1.5625, 1e-9));
+    expect(autoTimes(s, massa, pan20, 1, cuts: 3), closeTo(0.5, 1e-9));
+  });
+
+  test('recheio por camada multiplica pelas camadas', () {
+    final pan20 = s.pans.firstWhere(
+      (p) => p.shape == PanShape.round && p.a == 20,
+    );
+    final recheio = Recipe(
+      id: 'r',
+      name: 'Brigadeiro',
+      category: RecipeCategory.recheio,
+      panId: pan20.id,
+      perLayer: true,
+    );
+    expect(layersFor(2, 2), 3); // 4 discos, 3 camadas
+    expect(autoTimes(s, recheio, pan20, 2, cuts: 2), closeTo(3, 1e-9));
+    expect(autoTimes(s, recheio, pan20, 1), 0);
+  });
+
   test('custo em um mercado marca o que falta', () {
     final n = needs(s, [SimPart(massa.id, 1)]);
     final atA = costAt(s, n, a);

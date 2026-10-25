@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../calc.dart';
 import '../format.dart';
@@ -21,6 +22,9 @@ class SimulateScreen extends StatefulWidget {
 class _SimulateScreenState extends State<SimulateScreen> {
   String? _panId;
   int _count = 1;
+
+  /// Em quantos discos cada bolo é cortado com a linha.
+  int _cuts = 1;
   final List<SimPart> _parts = [];
 
   /// Partes em que ela mexeu na quantidade de vezes à mão.
@@ -44,8 +48,67 @@ class _SimulateScreenState extends State<SimulateScreen> {
     for (final p in _parts) {
       if (_manual.contains(p)) continue;
       final r = s.recipe(p.recipeId);
-      if (r != null) p.times = autoTimes(s, r, pan, _count);
+      if (r != null) p.times = autoTimes(s, r, pan, _count, cuts: _cuts);
     }
+  }
+
+  void _setShape(AppStore s, VoidCallback change) => setState(() {
+    change();
+    _recalcTimes(s);
+  });
+
+  String _quoteText(AppStore s, PriceBreakdown pb) {
+    final names = [for (final p in _parts) s.recipe(p.recipeId)!.name];
+    final discs = _count * _cuts;
+    final slices = (_slices ?? 0) > 0 ? _slices!.round() : null;
+    return [
+      'Olá! Segue o orçamento do bolo:',
+      '',
+      '🎂 ${names.join(' + ')}',
+      '${panLabel(s.pan(_panId))}'
+          '${discs > 1 ? ' · $discs camadas de massa' : ''}',
+      if (slices != null) 'Rende cerca de $slices fatias',
+      '',
+      'Valor: *${brl(pb.rounded)}*',
+    ].join('\n');
+  }
+
+  Future<void> _sendQuote(AppStore s, PriceBreakdown pb) async {
+    final c = TextEditingController(text: _quoteText(s, pb));
+    final send = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          0,
+          20,
+          MediaQuery.of(ctx).viewInsets.bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Mandar orçamento', style: Theme.of(ctx).textTheme.titleLarge),
+            const SizedBox(height: 4),
+            const Text('Pode mudar o texto antes de mandar.'),
+            const SizedBox(height: 16),
+            TextField(controller: c, minLines: 6, maxLines: 12),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(ctx, true),
+              icon: const Icon(Icons.send),
+              label: const Text('Abrir WhatsApp'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (send != true) return;
+    final url = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(c.text)}');
+    final ok = await launchUrl(url, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) toast(context, 'Não consegui abrir o WhatsApp');
   }
 
   Future<void> _addRecipe(AppStore s) async {
@@ -90,7 +153,9 @@ class _SimulateScreenState extends State<SimulateScreen> {
     if (id == null) return;
     final r = s.recipe(id)!;
     setState(
-      () => _parts.add(SimPart(id, autoTimes(s, r, s.pan(_panId), _count))),
+      () => _parts.add(
+        SimPart(id, autoTimes(s, r, s.pan(_panId), _count, cuts: _cuts)),
+      ),
     );
   }
 
@@ -150,45 +215,43 @@ class _SimulateScreenState extends State<SimulateScreen> {
                       for (final p in s.pans)
                         DropdownMenuItem(value: p.id, child: Text(panLabel(p))),
                     ],
-                    onChanged: (v) => setState(() {
-                      _panId = v;
-                      _recalcTimes(s);
-                    }),
+                    onChanged: (v) => _setShape(s, () => _panId = v),
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Quantas formas',
-                          style: t.textTheme.titleMedium,
-                        ),
+                  CountRow(
+                    label: 'Quantas formas',
+                    value: _count,
+                    onChanged: (v) => _setShape(s, () => _count = v),
+                  ),
+                  const SizedBox(height: 8),
+                  CountRow(
+                    label: 'Cortar cada bolo em',
+                    helper: 'Discos separados com a linha',
+                    value: _cuts,
+                    max: 6,
+                    onChanged: (v) => _setShape(s, () => _cuts = v),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: t.colorScheme.secondaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      () {
+                        final discs = _count * _cuts;
+                        final layers = layersFor(_count, _cuts);
+                        return '$discs ${discs == 1 ? 'disco' : 'discos'} de massa · '
+                            '$layers ${layers == 1 ? 'camada' : 'camadas'} de recheio';
+                      }(),
+                      style: t.textTheme.titleSmall?.copyWith(
+                        color: t.colorScheme.onSecondaryContainer,
                       ),
-                      IconButton.filledTonal(
-                        onPressed: _count > 1
-                            ? () => setState(() {
-                                _count--;
-                                _recalcTimes(s);
-                              })
-                            : null,
-                        icon: const Icon(Icons.remove),
-                      ),
-                      SizedBox(
-                        width: 48,
-                        child: Text(
-                          '$_count',
-                          textAlign: TextAlign.center,
-                          style: t.textTheme.headlineSmall,
-                        ),
-                      ),
-                      IconButton.filledTonal(
-                        onPressed: () => setState(() {
-                          _count++;
-                          _recalcTimes(s);
-                        }),
-                        icon: const Icon(Icons.add),
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),
@@ -334,6 +397,12 @@ class _SimulateScreenState extends State<SimulateScreen> {
             ),
             const SizedBox(height: 16),
             _resultCard(context, pb, chosenMarket),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () => _sendQuote(s, pb),
+              icon: const Icon(Icons.chat),
+              label: const Text('Mandar orçamento no WhatsApp'),
+            ),
           ],
         ],
       ),
@@ -362,7 +431,7 @@ class _SimulateScreenState extends State<SimulateScreen> {
                     children: [
                       Text(r.name, style: t.textTheme.titleMedium),
                       Text(
-                        '${r.category.label} · receita para ${panLabel(base)}',
+                        '${r.category.label} · ${recipeYield(r, base)}',
                         style: t.textTheme.bodySmall,
                       ),
                     ],
@@ -404,7 +473,9 @@ class _SimulateScreenState extends State<SimulateScreen> {
                           child: const Text('Voltar ao cálculo pela forma'),
                         )
                       : Text(
-                          'Ajustado pela forma e quantidade',
+                          r.perLayer
+                              ? 'Ajustado pelas camadas e pela forma'
+                              : 'Ajustado pela forma e quantidade',
                           style: t.textTheme.bodySmall?.copyWith(
                             color: t.colorScheme.onSurfaceVariant,
                           ),

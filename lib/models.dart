@@ -156,6 +156,8 @@ class Recipe {
     this.panId,
     List<RecipeItem>? items,
     this.notes = '',
+    this.yieldPans = 1,
+    this.perLayer = false,
   }) : items = items ?? [];
   final String id;
   String name;
@@ -168,6 +170,12 @@ class Recipe {
   /// Modo de preparo / anotações.
   String notes;
 
+  /// Quantas formas uma receita rende (ex.: massa que ela assa em 2 formas).
+  int yieldPans;
+
+  /// Recheio: a quantidade é para 1 camada; multiplica pelas camadas do bolo.
+  bool perLayer;
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
@@ -175,6 +183,8 @@ class Recipe {
     'panId': panId,
     'items': items.map((e) => e.toJson()).toList(),
     'notes': notes,
+    'yieldPans': yieldPans,
+    'perLayer': perLayer,
   };
   factory Recipe.fromJson(Map<String, dynamic> j) => Recipe(
     id: j['id'],
@@ -185,6 +195,8 @@ class Recipe {
         .map((e) => RecipeItem.fromJson(e as Map<String, dynamic>))
         .toList(),
     notes: j['notes'] ?? '',
+    yieldPans: j['yieldPans'] ?? 1,
+    perLayer: j['perLayer'] ?? false,
   );
 }
 

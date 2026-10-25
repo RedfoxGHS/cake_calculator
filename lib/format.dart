@@ -44,3 +44,10 @@ String ago(DateTime d) {
 }
 
 bool isStale(DateTime d) => DateTime.now().difference(d).inDays > 30;
+
+/// "Rende 2 formas Redonda 20 cm", "1 camada na Redonda 20 cm"...
+String recipeYield(Recipe r, Pan? base) {
+  if (r.perLayer) return '1 camada na ${panLabel(base)}';
+  final n = r.yieldPans;
+  return 'rende $n ${n == 1 ? 'forma' : 'formas'} ${panLabel(base)}';
+}

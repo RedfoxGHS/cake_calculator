@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'models.dart';
 import 'store.dart';
 
@@ -8,12 +10,19 @@ class SimPart {
   double times;
 }
 
+/// Camadas de recheio: cada bolo cortado em [cuts] discos, empilhados.
+int layersFor(int count, int cuts) => math.max(0, count * cuts - 1);
+
 /// Quantas vezes a receita precisa ser feita para [count] formas [target],
-/// comparando a área do fundo com a forma em que a receita foi escrita.
-double autoTimes(AppStore s, Recipe r, Pan? target, int count) {
+/// cada bolo cortado em [cuts] discos. Compara a área do fundo com a forma
+/// em que a receita foi escrita e quantas formas ela rende.
+double autoTimes(AppStore s, Recipe r, Pan? target, int count, {int cuts = 1}) {
   final base = s.pan(r.panId);
-  if (base == null || target == null || base.area <= 0) return count.toDouble();
-  return target.area / base.area * count;
+  final ratio = base == null || target == null || base.area <= 0
+      ? 1.0
+      : target.area / base.area;
+  if (r.perLayer) return ratio * layersFor(count, cuts);
+  return ratio * count / math.max(1, r.yieldPans);
 }
 
 /// Soma de tudo que o bolo usa, por produto (na unidade base).

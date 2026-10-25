@@ -295,3 +295,64 @@ class _PackageInputState extends State<PackageInput> {
 /// Texto "R$ 5,49 o kg" para um preço.
 String perRef(Price p, UnitType u) =>
     '${brl(p.perBase * u.refQty)} o ${u.refLabel}';
+
+/// Linha "Quantas formas   (−) 2 (+)".
+class CountRow extends StatelessWidget {
+  const CountRow({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    this.min = 1,
+    this.max = 20,
+    this.helper,
+  });
+  final String label;
+  final int value;
+  final ValueChanged<int> onChanged;
+  final int min;
+  final int max;
+  final String? helper;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: t.textTheme.titleMedium),
+              if (helper != null)
+                Text(
+                  helper!,
+                  style: t.textTheme.bodySmall?.copyWith(
+                    color: t.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        IconButton.filledTonal(
+          tooltip: 'Menos',
+          onPressed: value > min ? () => onChanged(value - 1) : null,
+          icon: const Icon(Icons.remove),
+        ),
+        SizedBox(
+          width: 44,
+          child: Text(
+            '$value',
+            textAlign: TextAlign.center,
+            style: t.textTheme.headlineSmall,
+          ),
+        ),
+        IconButton.filledTonal(
+          tooltip: 'Mais',
+          onPressed: value < max ? () => onChanged(value + 1) : null,
+          icon: const Icon(Icons.add),
+        ),
+      ],
+    );
+  }
+}
